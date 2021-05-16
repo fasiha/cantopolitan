@@ -1,6 +1,6 @@
 from chinese import ChineseAnalyzer
 from readings import init as initReadings
-from cccanto import CantoDict, init as initDict
+from cccanto import init as initDict
 import itertools as it
 import typing
 import re
@@ -139,4 +139,5 @@ def morphemeToRuby(m: Morpheme) -> str:
 
 
 ruby = "".join("".join(map(morphemeToRuby, line)) for line in parsed)
+print("# Readings as HTML")
 print(ruby)
