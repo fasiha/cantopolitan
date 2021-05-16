@@ -1,0 +1,4 @@
+chinese==0.2.1
+click==8.0.0
+jieba==0.42.1
+PyNLPIR==0.6.0
