@@ -4,15 +4,12 @@ from cccanto import CantoDict, init as initDict
 import itertools as it
 import typing
 import re
+import sys
 
 readings = initReadings('cccedict-canto-readings-150923.txt')
 cdict = initDict('cccanto-webdist.txt')
 
 analyzer = ChineseAnalyzer()
-
-lines = """大香港精神
-
-行開啲啦 一個二個"""
 
 
 def cleanPinyin(pinyin: typing.Optional[list[str]]) -> typing.Optional[str]:
@@ -46,7 +43,7 @@ def accumulate(key: str):
 
 
 parsed: list[list[Morpheme]] = []
-for line in lines.strip().splitlines():
+for line in sys.stdin.readlines():
   if len(line) == 0:
     parsed.append([Morpheme(hanzi='', pinyin=None, canto=None)])
     continue
@@ -141,6 +138,5 @@ def morphemeToRuby(m: Morpheme) -> str:
   return f'<ruby>{m["hanzi"]}<rt>{canto}{more}</rt></ruby>'
 
 
-ruby = "\n".join("".join(map(morphemeToRuby, line)) for line in parsed)
+ruby = "".join("".join(map(morphemeToRuby, line)) for line in parsed)
 print(ruby)
-open('ruby.md', 'w').write(ruby)
