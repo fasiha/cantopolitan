@@ -86,7 +86,7 @@ for line in sys.stdin.readlines():
 
     replaceSlice = slice(startIdx, startIdx + numAccum)
     morphemes[replaceSlice] = [mergeMorphemes(morphemes[replaceSlice], cantos)]
-    startIdx += numAccum
+    startIdx += 1
 
   print(morphemes)
   parsed.append(morphemes)
