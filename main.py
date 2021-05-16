@@ -90,7 +90,9 @@ for line in sys.stdin.readlines():
 
   print(morphemes)
   parsed.append(morphemes)
+  # ABOVE: used for ruby analysis later
 
+  # BELOW: printout for definitions and general insight into parsing
   for tokenIdx, token in enumerate(result.tokens()):
     print(f'### {token}')
     for hitIdx, hit in enumerate(result[token]):
@@ -98,6 +100,7 @@ for line in sys.stdin.readlines():
         print(f"#### {hitIdx}")
 
       print(hit)
+      accumulatedFound = 0
       for accum in it.accumulate(result.tokens()[tokenIdx:]):
         checkReadings = accum in readings
         checkDict = accum in cdict
@@ -108,6 +111,11 @@ for line in sys.stdin.readlines():
         if not (checkDict or checkReadings):
           # stop searching for longer runs of text
           break
+        accumulatedFound += 1
+      if accumulatedFound == 0 and hit.pinyin is None:
+        # this wasn't found in either Canto dataset, and no pinyin
+        # ok for punctuation though
+        print('NO READINGS FOUND')
 
 print(parsed)
 
