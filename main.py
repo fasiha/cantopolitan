@@ -3,6 +3,7 @@ from readings import init as initReadings
 from cccanto import CantoDict, init as initDict
 import itertools as it
 import typing
+import re
 
 readings = initReadings('cccedict-canto-readings-150923.txt')
 cdict = initDict('cccanto-webdist.txt')
@@ -114,12 +115,29 @@ for line in lines.strip().splitlines():
 print(parsed)
 
 
+def cantoneseToHtml(c: str) -> str:
+  num = re.compile('[0-9]$')
+  match = num.search(c)
+  if not match:
+    return c
+  word = c[:match.start()]
+  tone = c[match.start():]
+  return f'{word}<sup>{tone}</sup>'
+
+
 def morphemeToRuby(m: Morpheme) -> str:
   if m['canto'] is None:
     return m['hanzi']
-  canto: str = next(iter(m['canto']), '')
-  canto = canto.replace(' ', '')
+
   more = '' if len(m['canto']) == 1 else '<sup>+</sup>'
+  canto: str = next(iter(m['canto']), '')
+  cantos = canto.split(' ')
+  if len(cantos) == len(m['hanzi']):
+    hanzis = iter(m['hanzi'])
+    return "".join(
+        f"<ruby>{h}<rt>{cantoneseToHtml(c)}{more}</rt></ruby>" for h, c in zip(hanzis, cantos))
+
+  canto = canto.replace(' ', '')
   return f'<ruby>{m["hanzi"]}<rt>{canto}{more}</rt></ruby>'
 
 
