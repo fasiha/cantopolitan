@@ -21,7 +21,7 @@ def cleanPinyin(pinyin: typing.Optional[list[str]]) -> typing.Optional[str]:
 def noneSetToNone(s: set[typing.Optional[str]]) -> typing.Optional[set[str]]:
   if len(s) == 1 and (None in s):
     return None
-  return s  # mypy rightly points out that this might still contain None
+  return {elt for elt in s if elt is not None}
 
 
 class Morpheme(typing.TypedDict):
@@ -80,7 +80,7 @@ for line in sys.stdin.readlines():
     numAccum = accumulated[-1][0]
     morpheme = morphemes[startIdx]
     if numAccum == 1 and morpheme['pinyin']:
-      cantos = {canto for pinyin, canto in pinyinCantos if pinyin in morpheme['pinyin']}
+      cantos = {canto for pinyin, canto in pinyinCantos if pinyin in (morpheme['pinyin'] or {})}
     else:
       cantos = {canto for pinyin, canto in pinyinCantos}
 
