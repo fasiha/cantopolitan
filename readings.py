@@ -2,7 +2,7 @@ import typing
 import json
 import os.path
 
-CantoReadings = typing.Dict[str, typing.List[typing.Tuple[str, str]]]
+CantoReadings = dict[str, list[tuple[str, str]]]
 # hanzi (traditional) to list of (Mandarin pinyin, Cantonese pinyin)
 
 

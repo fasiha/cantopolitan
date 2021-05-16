@@ -2,7 +2,9 @@ import typing
 import json
 import os.path
 
-CantoDict = typing.Dict[str, typing.List[typing.Tuple[str, str, typing.List[str]]]]
+#                                     v Cantonese
+CantoDict = dict[str, list[tuple[str, str, str]]]
+#                ^ hanzi         ^ pinyin  ^ English
 
 
 def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoDict:
@@ -24,7 +26,7 @@ def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoDict:
       cantonese = cantonese[:-1]  # drop final `}`
 
       glosses = glosses.split('#', 1)[0]  # drop trailing comments
-      glosses = [g.strip() for g in glosses.split('/') if len(g) > 0]
+      glosses = glosses[:-1]  # drop final `/`
 
       result = (mandarin, cantonese, glosses)
       if trad in d:
