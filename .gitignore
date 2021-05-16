@@ -1,0 +1,11 @@
+*.txt
+*.html
+*.css
+*.md
+*.json
+*.sh
+*.zip
+.DS_Store
+__pycache__/
+*-venv/
+
