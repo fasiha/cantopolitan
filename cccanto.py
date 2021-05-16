@@ -1,3 +1,21 @@
+"""
+Full CC-Canto dictionary data
+
+Loads the [CC-Canto](https://cantonese.org/download.html) dictionary ("The
+latest version of CC-Canto …"). This is a text file whose lines have the
+following format:
+```
+[traditional hanzi] [simplified hanzi] [Mandarin pinyin] {Cantonese pinyin} /English glosses/
+```
+
+The dictionary is returned in a dict whose type is given by `CantoDict` below.
+The keys are hanzi, and values are a list of 3-tuples, `(Mandarin pinyin,
+Cantonese pinyin, English glosses)`. These tuples are in a list because a single
+hanzi can have multiple entries.
+
+A JSON copy of the returned dict will be saved for faster loading.
+"""
+
 import typing
 import json
 import os.path
@@ -8,6 +26,14 @@ CantoDict = dict[str, list[tuple[str, str, str]]]
 
 
 def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoDict:
+  """Loads the CC-Canto dictionary
+
+  `file` is assumed to point to a CC-Canto dictionary file (currently called
+  "cccanto-webdist.txt").
+
+  A JSON file of the returned dict will be saved in `jsonfile` (by default,
+  `file + '.json'`).
+  """
   jsonfile = jsonfile or (file + '.json')
 
   if os.path.exists(jsonfile):
