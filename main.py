@@ -5,6 +5,7 @@ import itertools as it
 import typing
 import re
 import sys
+from wordfill import fill as wordfill
 
 readings = initReadings('cccedict-canto-readings-150923.txt')
 cdict = initDict('cccanto-webdist.txt')
@@ -40,6 +41,75 @@ def mergeMorphemes(ms: list[Morpheme], cantos: set[str]) -> Morpheme:
 
 def accumulate(key: str):
   return readings[key] if key in readings else None, cdict[key] if key in cdict else None
+
+
+def allSubwords(s: str):
+  """
+  Given a string, return an iterator that gives all contiguous substrings.
+
+  For `abc`, you get
+  - `a`
+  - `ab`
+  - `abc`
+  - `b`
+  - `bc`
+  - `c`
+  """
+  return it.chain.from_iterable(it.accumulate(s[i:]) for i in range(len(s)))
+
+
+def hanziToCantos(key: str) -> set[str]:
+  s: set[str] = set()
+  s |= set(entry[1] for entry in cdict[key]) if key in cdict else set()
+  s |= set(entry[1] for entry in readings[key]) if key in readings else set()
+  return s
+
+
+# I want to emphasize that these are guessed
+def reformatGuessedCantos(s: set[str]) -> set[str]:
+  return set(map(lambda s: '¿' + ' -'.join(s.split(' ')), s))
+
+
+# There are going to be words where we didn't find Cantonese readings.
+# Break down these morphemes into individual pieces and try to find dictionary entries for these.
+# Prefer the longest dictionary hit. This is risky!
+def guessMissingReadings(morphemes: list[Morpheme]):
+  # Step 1: build a small dictionary of all sub-words (spanning morpheme boundaries)
+  whitespace = re.compile('^\\s*$')
+  pred: typing.Callable[[Morpheme],
+                        bool] = lambda m: bool(m['canto'] or whitespace.match(m['hanzi']))
+  missing: set[str] = set()
+  for i, morpheme in enumerate(morphemes):
+    if pred(morpheme):
+      continue
+    adjacent = list(it.takewhile(lambda m: not pred(m), morphemes[i:]))
+    for hanzi in allSubwords("".join(m['hanzi'] for m in adjacent)):
+      if hanzi in missing:
+        continue
+      if hanzi in cdict or hanzi in readings:
+        missing.add(hanzi)
+
+  # Step 2: find the largest words to "fill" a morpheme
+  i = 0
+  while i < len(morphemes):
+    morpheme = morphemes[i]
+    if pred(morpheme):
+      i += 1
+      continue
+    found = [k for k in allSubwords(morpheme['hanzi']) if k in missing]
+    mash = "".join(found)
+    if not all(char in mash for char in morpheme['hanzi']):
+      i += 1
+      continue
+    # we have a hit for all characters in hanzi. Fill in the "biggest" first, greedily
+    pieces = wordfill(morpheme['hanzi'], found)
+
+    newMorphemes = [
+        Morpheme(hanzi=p, pinyin=None, canto=reformatGuessedCantos(hanziToCantos(p)))
+        for p in pieces
+    ]
+    morphemes[i:i + 1] = newMorphemes
+    i += len(pieces)
 
 
 parsed: list[list[Morpheme]] = []
@@ -87,6 +157,8 @@ for line in sys.stdin.readlines():
     replaceSlice = slice(startIdx, startIdx + numAccum)
     morphemes[replaceSlice] = [mergeMorphemes(morphemes[replaceSlice], cantos)]
     startIdx += 1
+
+  guessMissingReadings(morphemes)
 
   print(morphemes)
   parsed.append(morphemes)
