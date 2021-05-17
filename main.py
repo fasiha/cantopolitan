@@ -207,7 +207,7 @@ def morphemeToRuby(m: Morpheme) -> str:
     return m['hanzi']
 
   more = '' if len(m['canto']) == 1 else '<sup>+</sup>'
-  canto: str = next(iter(m['canto']), '')
+  canto: str = min(m['canto'], default='unknown')
   cantos = canto.split(' ')
   if len(cantos) == len(m['hanzi']):
     hanzis = iter(m['hanzi'])
