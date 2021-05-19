@@ -44,8 +44,8 @@ def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoReadings:
         continue
       trad, _, readings = line.strip().split(" ", 2)
       mandarin, cantonese = readings.strip().split('] {')
-      mandarin = mandarin[1:].strip()  # drop initial `[`
-      cantonese = cantonese[:-1]  # drop final `}`
+      mandarin = mandarin.removeprefix('[')
+      cantonese = cantonese.removesuffix('}')
       result = (mandarin, cantonese)
       if trad in d:
         d[trad].append(result)

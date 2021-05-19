@@ -48,11 +48,11 @@ def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoDict:
       readings, glosses = rest.split('/', 1)
 
       mandarin, cantonese = readings.strip().split('] {')
-      mandarin = mandarin[1:].strip()  # drop initial `[`
-      cantonese = cantonese[:-1]  # drop final `}`
+      mandarin = mandarin.removeprefix('[').strip()
+      cantonese = cantonese.removesuffix('}')
 
       glosses = glosses.split('#', 1)[0]  # drop trailing comments
-      glosses = glosses[:-1]  # drop final `/`
+      glosses = glosses.strip().removesuffix('/')
 
       result = (mandarin, cantonese, glosses)
       if trad in d:
