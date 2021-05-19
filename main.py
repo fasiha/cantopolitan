@@ -5,11 +5,12 @@ import itertools as it
 import typing
 import re
 import sys
+from cache_analysis import cache_analysis
 from wordfill import fill as wordfill
 
 readings = initReadings('cccedict-canto-readings-150923.txt')
 cdict = initDict('cccanto-webdist.txt')
-
+ANALYSIS_CACHE_FILE = 'analysis_cache.pickle'
 analyzer = ChineseAnalyzer()
 
 
@@ -111,14 +112,29 @@ def guessMissingReadings(morphemes: list[Morpheme]):
     i += len(pieces)
 
 
+ChineseAnalyzerResult = typing.Any
+
+linesResults: list[tuple[str, typing.Optional[ChineseAnalyzerResult]]] = []
+with cache_analysis(ANALYSIS_CACHE_FILE, analyzer) as cache:
+  for line in sys.stdin.readlines():
+    if len(line) == 0:
+      result = None
+    else:
+      if line in cache:
+        result = cache[line]
+      else:
+        result = analyzer.parse(line, traditional=True)
+        cache[line] = result
+
+    linesResults.append((line, result))
+
 parsed: list[list[Morpheme]] = []
-for line in sys.stdin.readlines():
-  if len(line) == 0:
+for line, result in linesResults:
+  if result is None:
     parsed.append([Morpheme(hanzi='', pinyin=None, canto=None)])
     continue
 
   print(f'## {line}')
-  result = analyzer.parse(line, traditional=True)
 
   morphemes = [
       Morpheme(
