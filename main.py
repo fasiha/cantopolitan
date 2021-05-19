@@ -75,14 +75,13 @@ def reformatGuessedCantos(s: set[str]) -> set[str]:
 # Prefer the longest dictionary hit. This is risky!
 def guessMissingReadings(morphemes: list[Morpheme]):
   # Step 1: build a small dictionary of all sub-words (spanning morpheme boundaries)
-  whitespace = re.compile('^\\s*$')
-  pred: typing.Callable[[Morpheme],
-                        bool] = lambda m: bool(m['canto'] or whitespace.match(m['hanzi']))
+  guessNeededPredicate: typing.Callable[
+      [Morpheme], bool] = lambda m: bool(m['canto'] or len(m['hanzi'].strip()))
   missing: set[str] = set()
   for i, morpheme in enumerate(morphemes):
-    if pred(morpheme):
+    if guessNeededPredicate(morpheme):
       continue
-    adjacent = list(it.takewhile(lambda m: not pred(m), morphemes[i:]))
+    adjacent = list(it.takewhile(lambda m: not guessNeededPredicate(m), morphemes[i:]))
     for hanzi in allSubwords("".join(m['hanzi'] for m in adjacent)):
       if hanzi in missing:
         continue
@@ -93,7 +92,7 @@ def guessMissingReadings(morphemes: list[Morpheme]):
   i = 0
   while i < len(morphemes):
     morpheme = morphemes[i]
-    if pred(morpheme):
+    if guessNeededPredicate(morpheme):
       i += 1
       continue
     found = [k for k in allSubwords(morpheme['hanzi']) if k in missing]
