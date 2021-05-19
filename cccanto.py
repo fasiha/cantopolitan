@@ -9,9 +9,11 @@ following format:
 ```
 
 The dictionary is returned in a dict whose type is given by `CantoDict` below.
-The keys are hanzi, and values are a list of 3-tuples, `(Mandarin pinyin,
-Cantonese pinyin, English glosses)`. These tuples are in a list because a single
-hanzi can have multiple entries.
+The keys are hanzi, and values are a list of entries where each entry has
+- Mandarin pinyin,
+- Cantonese pinyin,
+- English gloss, and
+- the hanzi again.
 
 A JSON copy of the returned dict will be saved for faster loading.
 """
@@ -20,9 +22,16 @@ import typing
 import json
 import os.path
 
-#                                     v Cantonese
-CantoDict = dict[str, list[tuple[str, str, str]]]
-#                ^ hanzi         ^ pinyin  ^ English
+
+class CantoEntry(typing.TypedDict):
+  hanzi: str
+  mandarin: str
+  cantonese: str
+  definition: str
+
+
+Hanzi = str
+CantoDict = dict[Hanzi, list[CantoEntry]]
 
 
 def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoDict:
@@ -54,7 +63,7 @@ def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoDict:
       glosses = glosses.split('#', 1)[0]  # drop trailing comments
       glosses = glosses.strip().removesuffix('/')
 
-      result = (mandarin, cantonese, glosses)
+      result = CantoEntry(hanzi=trad, mandarin=mandarin, cantonese=cantonese, definition=glosses)
       if trad in d:
         d[trad].append(result)
       else:

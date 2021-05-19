@@ -10,8 +10,12 @@ This file has lines in the format
 ```
 
 The dict returned has type `CantoReadings` below: its keys are traditional
-hanzi, and its values are lists of `(Mandarin pinyin, Cantonese pinyin)` tuples.
-The pinyin tuples are in a *list* because the same hanzi can correspond to
+hanzi, and its values are lists of entries, each entry consisting of
+- Mandarin pinyin,
+- Cantonese pinyin, and
+- the original hanzi again.
+
+The entries are in a *list* because the same hanzi can correspond to
 multiple readings.
 
 Caches the dict to JSON for faster loading.
@@ -21,8 +25,15 @@ import typing
 import json
 import os.path
 
-CantoReadings = dict[str, list[tuple[str, str]]]
-# hanzi (traditional) to list of (Mandarin pinyin, Cantonese pinyin)
+
+class ReadingEntry(typing.TypedDict):
+  hanzi: str
+  mandarin: str
+  cantonese: str
+
+
+Hanzi = str
+CantoReadings = dict[Hanzi, list[ReadingEntry]]
 
 
 def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoReadings:
@@ -46,7 +57,7 @@ def init(file: str, jsonfile: typing.Optional[str] = None) -> CantoReadings:
       mandarin, cantonese = readings.strip().split('] {')
       mandarin = mandarin.removeprefix('[')
       cantonese = cantonese.removesuffix('}')
-      result = (mandarin, cantonese)
+      result = ReadingEntry(hanzi=trad, mandarin=mandarin, cantonese=cantonese)
       if trad in d:
         d[trad].append(result)
       else:

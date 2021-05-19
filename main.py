@@ -1,6 +1,6 @@
 from chinese import ChineseAnalyzer
-from readings import init as initReadings
-from cccanto import init as initDict
+from readings import ReadingEntry, init as initReadings
+from cccanto import CantoEntry, init as initDict
 import itertools as it
 import typing
 import re
@@ -28,16 +28,25 @@ def noneSetToNone(s: set[typing.Optional[str]]) -> typing.Optional[set[str]]:
 
 class Morpheme(typing.TypedDict):
   hanzi: str
-  pinyin: typing.Optional[set[str]]
-  canto: typing.Optional[set[str]]
+  pinyins: list[
+      typing.Optional[str]]  # Jieba's hits per token, so at least 1, maybe more; all maybe None
+  definitions: list[typing.Optional[list[str]]]  # same as above
+  cantoDefinitions: list[CantoEntry]  # matched by hanzi
+  cantoPinyins: list[ReadingEntry]  # also matched by hanzi but for comparison to pinyins
+  # len(cantoDefinitions) might be != len(cantoPinyins)!
+  merged: bool  # should default to false; when we create a new morpheme from multiple ones, set this to true
+  hidden: bool  # should default to false; when a merged morpheme overshadows a Jieba morpheme, hide the latter
 
 
-def mergeMorphemes(ms: list[Morpheme], cantos: set[str]) -> Morpheme:
-  hanzi = "".join(m['hanzi'] for m in ms)
-  pinyin: set[str] = set()
-  for m in ms:
-    pinyin |= m['pinyin'] or set()
-  return Morpheme(hanzi=hanzi, pinyin=pinyin, canto=cantos)
+def initMorpheme(hanzi: str) -> Morpheme:
+  return Morpheme(
+      hanzi=hanzi,
+      pinyins=[],
+      definitions=[],
+      cantoDefinitions=[],
+      cantoPinyins=[],
+      merged=False,
+      hidden=False)
 
 
 def accumulate(key: str):
@@ -61,8 +70,8 @@ def allSubwords(s: str):
 
 def hanziToCantos(key: str) -> set[str]:
   s: set[str] = set()
-  s |= set(entry[1] for entry in cdict[key]) if key in cdict else set()
-  s |= set(entry[1] for entry in readings[key]) if key in readings else set()
+  s |= set(entry['cantonese'] for entry in cdict[key]) if key in cdict else set()
+  s |= set(entry['cantonese'] for entry in readings[key]) if key in readings else set()
   return s
 
 
@@ -128,83 +137,74 @@ with cache_analysis(ANALYSIS_CACHE_FILE, analyzer) as cache:
 
     linesResults.append((line, result))
 
-parsed: list[list[Morpheme]] = []
+parsed: list[typing.Optional[list[Morpheme]]] = []
+# outer list: lines
+# inner list: morphemes or nothing (empty line)
+
 for line, result in linesResults:
   if result is None:
-    parsed.append([Morpheme(hanzi='', pinyin=None, canto=None)])
+    parsed.append(None)
     continue
 
   print(f'## {line}')
 
-  morphemes = [
-      Morpheme(
-          hanzi=str(token),
-          pinyin=noneSetToNone({cleanPinyin(hit.pinyin) for hit in result[token]}),
-          canto=None) for token in result.tokens()
-  ]
+  morphemes: list[Morpheme] = []
+  for token in result.tokens():
+    morpheme = initMorpheme(token)
+    for hit in result[token]:
+      morpheme['pinyins'].append(cleanPinyin(hit.pinyin) if hit.pinyin else None)
+      morpheme['definitions'].append(hit.definitions)
+    morpheme['cantoDefinitions'] = cdict[token] if token in cdict else []
+    morpheme['cantoPinyins'] = readings[token] if token in readings else []
+    morphemes.append(morpheme)
 
+  # This list of morphemes may have a few things wrong with it:
+  # 1. Instead of one morpheme object per real morpheme, Jieba might have given us TWO or more. We need the user to downselect for us.
+  # 2. We might be able to consolidate multiple morphemes into a single one if we find a run of them in the CC-Canto.
+  # 3. We *definitely* don't have any Cantonese readings
+
+  # Let's try to do #2: loop thru the list of tokens and see if we can consolidate more than one element
   startIdx = 0
   while startIdx < len(morphemes):
-    accumulated = [
-        (idx + 1, accumulate(accum))
-        for idx, accum in enumerate(it.accumulate(p['hanzi'] for p in morphemes[startIdx:]))
-    ]
-    accumulated = [a for a in accumulated if a[1][0] or a[1][1]]
-    if len(accumulated) == 0:
-      startIdx += 1
-      continue
+    numAccumulated = 0
 
-    cantoReading, cantoEntry = accumulated[-1][1]
+    accumulatingHanzi: enumerate[str] = enumerate(
+        it.accumulate(m['hanzi'] for m in morphemes[startIdx:]))
+    accumulatingEntries = [(idx, cdict[h] if h in cdict else None) for (idx, h) in accumulatingHanzi
+                          ]
+    # find longest run of morphemes' hanzi in dictionary
+    for idx, entries in reversed(accumulatingEntries):
+      if entries is None:
+        continue
+      # first non-None entry
+      if idx == 0:
+        # same hits as above, longer hit not found
+        break
+      # longest non-boring hit found!
 
-    pinyinCantos: list[tuple[str, str]] = []
-    if cantoReading:
-      pinyinCantos.extend((pinyin, canto) for pinyin, canto in cantoReading)
-    if cantoEntry:
-      pinyinCantos.extend((pinyin, canto) for pinyin, canto, english in cantoEntry)
+      numAccumulated = idx + 1
+      for oldMorpheme in morphemes[startIdx:startIdx + numAccumulated]:
+        oldMorpheme['hidden'] = True
 
-    numAccum = accumulated[-1][0]
-    morpheme = morphemes[startIdx]
-    if numAccum == 1 and morpheme['pinyin']:
-      cantos = {canto for pinyin, canto in pinyinCantos if pinyin in (morpheme['pinyin'] or {})}
-    else:
-      cantos = {canto for pinyin, canto in pinyinCantos}
+      newMorpheme = Morpheme(
+          hanzi=entries[0]['hanzi'],
+          pinyins=[],
+          definitions=[],
+          cantoPinyins=[],
+          cantoDefinitions=entries,
+          merged=True,
+          hidden=False)
+      morphemes.insert(startIdx, newMorpheme)
+      break
 
-    replaceSlice = slice(startIdx, startIdx + numAccum)
-    morphemes[replaceSlice] = [mergeMorphemes(morphemes[replaceSlice], cantos)]
-    startIdx += 1
+    startIdx += (numAccumulated + 1)
+    # skip all accumulated morphemes and the one we just inserted
 
-  guessMissingReadings(morphemes)
+  # guessMissingReadings(morphemes)
 
-  print(morphemes)
+  import json
+  print(json.dumps(morphemes, ensure_ascii=False))
   parsed.append(morphemes)
-  # ABOVE: used for ruby analysis later
-
-  # BELOW: printout for definitions and general insight into parsing
-  for tokenIdx, token in enumerate(result.tokens()):
-    print(f'### {token}')
-    for hitIdx, hit in enumerate(result[token]):
-      if len(result[token]) > 1:
-        print(f"#### {hitIdx}")
-
-      print(hit)
-      accumulatedFound = 0
-      for accum in it.accumulate(result.tokens()[tokenIdx:]):
-        checkReadings = accum in readings
-        checkDict = accum in cdict
-        if checkReadings:
-          print(f"READINGS={accum}", readings[accum])
-        if checkDict:
-          print(f"CANTO DICT={accum}", cdict[accum])
-        if not (checkDict or checkReadings):
-          # stop searching for longer runs of text
-          break
-        accumulatedFound += 1
-      if accumulatedFound == 0 and hit.pinyin is None:
-        # this wasn't found in either Canto dataset, and no pinyin
-        # ok for punctuation though
-        print('NO READINGS FOUND')
-
-print(parsed)
 
 
 def cantoneseToHtml(c: str) -> str:
@@ -218,11 +218,28 @@ def cantoneseToHtml(c: str) -> str:
 
 
 def morphemeToRuby(m: Morpheme) -> str:
-  if m['canto'] is None:
+  if m['hidden']:
+    return ''
+  if len(m['cantoDefinitions']) == 0 and len(m['cantoPinyins']) == 0:
     return m['hanzi']
 
-  more = '' if len(m['canto']) == 1 else '<sup>+</sup>'
-  canto: str = min(m['canto'], default='unknown')
+  pinyins = set(p for p in m['pinyins'] if p)
+  allCantos: set[str] = set()
+  if len(pinyins):
+    for d in m['cantoDefinitions']:
+      if d['mandarin'] in pinyins:
+        allCantos.add(d['cantonese'])
+    for r in m['cantoPinyins']:
+      if r['mandarin'] in pinyins:
+        allCantos.add(r['cantonese'])
+  else:
+    for d in m['cantoDefinitions']:
+      allCantos.add(d['cantonese'])
+    for r in m['cantoPinyins']:
+      allCantos.add(r['cantonese'])
+
+  more = '' if len(allCantos) == 1 else '<sup>+</sup>'
+  canto: str = min(allCantos, default='unknown')
   cantos = canto.split(' ')
   if len(cantos) == len(m['hanzi']):
     hanzis = iter(m['hanzi'])
@@ -233,6 +250,6 @@ def morphemeToRuby(m: Morpheme) -> str:
   return f'<ruby>{m["hanzi"]}<rt>{canto}{more}</rt></ruby>'
 
 
-ruby = "".join("".join(map(morphemeToRuby, line)) for line in parsed)
+ruby = "".join("".join(map(morphemeToRuby, line)) if line else '\n' for line in parsed)
 print("# Readings as HTML")
 print(ruby)
