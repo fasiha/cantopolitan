@@ -34,19 +34,26 @@ class Morpheme(typing.TypedDict):
   cantoDefinitions: list[CantoEntry]  # matched by hanzi
   cantoPinyins: list[ReadingEntry]  # also matched by hanzi but for comparison to pinyins
   # len(cantoDefinitions) might be != len(cantoPinyins)!
-  merged: bool  # should default to false; when we create a new morpheme from multiple ones, set this to true
-  hidden: bool  # should default to false; when a merged morpheme overshadows a Jieba morpheme, hide the latter
+  merged: bool  # should default to false if from Jieba; when we create a new morpheme from multiple ones, set this to true
+  hidden: bool  # should default to false if from Jieba; when a merged morpheme overshadows a Jieba morpheme, hide the latter
+  guessed: bool  # should default to false if from Jieba
 
 
-def initMorpheme(hanzi: str) -> Morpheme:
+def initMorpheme(hanzi: str,
+                 cantoDefinitions=[],
+                 cantoPinyins=[],
+                 merged=False,
+                 hidden=False,
+                 guessed=False) -> Morpheme:
   return Morpheme(
       hanzi=hanzi,
       pinyins=[],
       definitions=[],
-      cantoDefinitions=[],
-      cantoPinyins=[],
-      merged=False,
-      hidden=False)
+      cantoDefinitions=cantoDefinitions,
+      cantoPinyins=cantoPinyins,
+      merged=merged,
+      hidden=hidden,
+      guessed=guessed)
 
 
 def accumulate(key: str):
@@ -68,30 +75,19 @@ def allSubwords(s: str):
   return it.chain.from_iterable(it.accumulate(s[i:]) for i in range(len(s)))
 
 
-def hanziToCantos(key: str) -> set[str]:
-  s: set[str] = set()
-  s |= set(entry['cantonese'] for entry in cdict[key]) if key in cdict else set()
-  s |= set(entry['cantonese'] for entry in readings[key]) if key in readings else set()
-  return s
-
-
-# I want to emphasize that these are guessed
-def reformatGuessedCantos(s: set[str]) -> set[str]:
-  return set(map(lambda s: '¿' + ' -'.join(s.split(' ')), s))
-
-
 # There are going to be words where we didn't find Cantonese readings.
 # Break down these morphemes into individual pieces and try to find dictionary entries for these.
 # Prefer the longest dictionary hit. This is risky!
 def guessMissingReadings(morphemes: list[Morpheme]):
   # Step 1: build a small dictionary of all sub-words (spanning morpheme boundaries)
-  guessNeededPredicate: typing.Callable[
-      [Morpheme], bool] = lambda m: bool(m['canto'] or len(m['hanzi'].strip()))
+  guessNotNeededPredicate: typing.Callable[[Morpheme], bool] = lambda m: bool(
+      len(m['cantoDefinitions']) or len(m['cantoPinyins']) or m['hidden'] or 0 == len(m['hanzi'].
+                                                                                      strip()))
   missing: set[str] = set()
   for i, morpheme in enumerate(morphemes):
-    if guessNeededPredicate(morpheme):
+    if guessNotNeededPredicate(morpheme):
       continue
-    adjacent = list(it.takewhile(lambda m: not guessNeededPredicate(m), morphemes[i:]))
+    adjacent = list(it.takewhile(lambda m: not guessNotNeededPredicate(m), morphemes[i:]))
     for hanzi in allSubwords("".join(m['hanzi'] for m in adjacent)):
       if hanzi in missing:
         continue
@@ -102,7 +98,7 @@ def guessMissingReadings(morphemes: list[Morpheme]):
   i = 0
   while i < len(morphemes):
     morpheme = morphemes[i]
-    if guessNeededPredicate(morpheme):
+    if guessNotNeededPredicate(morpheme):
       i += 1
       continue
     found = [k for k in allSubwords(morpheme['hanzi']) if k in missing]
@@ -113,12 +109,20 @@ def guessMissingReadings(morphemes: list[Morpheme]):
     # we have a hit for all characters in hanzi. Fill in the "biggest" first, greedily
     pieces = wordfill(morpheme['hanzi'], found)
 
-    newMorphemes = [
-        Morpheme(hanzi=p, pinyin=None, canto=reformatGuessedCantos(hanziToCantos(p)))
-        for p in pieces
-    ]
-    morphemes[i:i + 1] = newMorphemes
-    i += len(pieces)
+    morphemes[i]['hidden'] = True
+
+    newMorphemes: list[Morpheme] = []
+    for p in pieces:
+      m = initMorpheme(p, guessed=True)
+      if p in cdict:
+        m['cantoDefinitions'] = cdict[p]
+      if p in readings:
+        m['cantoPinyins'] = readings[p]
+      newMorphemes.append(m)
+
+    morphemes[i:i] = newMorphemes
+
+    i += len(newMorphemes) + 1
 
 
 ChineseAnalyzerResult = typing.Any
@@ -186,35 +190,29 @@ for line, result in linesResults:
       for oldMorpheme in morphemes[startIdx:startIdx + numAccumulated]:
         oldMorpheme['hidden'] = True
 
-      newMorpheme = Morpheme(
-          hanzi=entries[0]['hanzi'],
-          pinyins=[],
-          definitions=[],
-          cantoPinyins=[],
-          cantoDefinitions=entries,
-          merged=True,
-          hidden=False)
+      newMorpheme = initMorpheme(entries[0]['hanzi'], cantoDefinitions=entries, merged=True)
+
       morphemes.insert(startIdx, newMorpheme)
       break
 
     startIdx += (numAccumulated + 1)
     # skip all accumulated morphemes and the one we just inserted
 
-  # guessMissingReadings(morphemes)
+  guessMissingReadings(morphemes)
 
   import json
   print(json.dumps(morphemes, ensure_ascii=False))
   parsed.append(morphemes)
 
 
-def cantoneseToHtml(c: str) -> str:
+def cantoneseToHtml(c: str, prefix='', suffix='') -> str:
   num = re.compile('[0-9]$')
   match = num.search(c)
   if not match:
     return c
   word = c[:match.start()]
   tone = c[match.start():]
-  return f'{word}<sup>{tone}</sup>'
+  return f'{prefix}{word}<sup>{tone}{suffix}</sup>'
 
 
 def morphemeToRuby(m: Morpheme) -> str:
@@ -239,15 +237,16 @@ def morphemeToRuby(m: Morpheme) -> str:
       allCantos.add(r['cantonese'])
 
   more = '' if len(allCantos) == 1 else '<sup>+</sup>'
+  guess = '¿' if m['guessed'] else ''
   canto: str = min(allCantos, default='unknown')
   cantos = canto.split(' ')
   if len(cantos) == len(m['hanzi']):
     hanzis = iter(m['hanzi'])
-    return "".join(
-        f"<ruby>{h}<rt>{cantoneseToHtml(c)}{more}</rt></ruby>" for h, c in zip(hanzis, cantos))
+    return "".join(f"<ruby>{h}<rt>{cantoneseToHtml(c, prefix=guess, suffix=more)}</rt></ruby>"
+                   for h, c in zip(hanzis, cantos))
 
   canto = canto.replace(' ', '')
-  return f'<ruby>{m["hanzi"]}<rt>{canto}{more}</rt></ruby>'
+  return f'<ruby>{m["hanzi"]}<rt>{guess}{canto}{more}</rt></ruby>'
 
 
 ruby = "".join("".join(map(morphemeToRuby, line)) if line else '\n' for line in parsed)
