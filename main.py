@@ -4,9 +4,9 @@ from cccanto import CantoEntry, init as initDict
 import itertools as it
 import typing
 import re
-import sys
 from cache_analysis import cache_analysis
 from wordfill import fill as wordfill
+from partition_by import partitionBy
 
 readings = initReadings('cccedict-canto-readings-150923.txt')
 cdict = initDict('cccanto-webdist.txt')
@@ -28,12 +28,15 @@ def noneSetToNone(s: set[typing.Optional[str]]) -> typing.Optional[set[str]]:
 
 class Morpheme(typing.TypedDict):
   hanzi: str
-  pinyins: list[
-      typing.Optional[str]]  # Jieba's hits per token, so at least 1, maybe more; all maybe None
-  definitions: list[typing.Optional[list[str]]]  # same as above
+
+  # Jieba's hits per token, so at least 1, maybe more; all maybe None
+  pinyins: list[typing.Optional[str]]
+  definitions: list[typing.Optional[list[str]]]  # inner list: separate sub-meanings
+
   cantoDefinitions: list[CantoEntry]  # matched by hanzi
   cantoPinyins: list[ReadingEntry]  # also matched by hanzi but for comparison to pinyins
-  # len(cantoDefinitions) might be != len(cantoPinyins)!
+  # N.B., len(cantoDefinitions) might be != len(cantoPinyins)!
+
   merged: bool  # should default to false if from Jieba; when we create a new morpheme from multiple ones, set this to true
   hidden: bool  # should default to false if from Jieba; when a merged morpheme overshadows a Jieba morpheme, hide the latter
   guessed: bool  # should default to false if from Jieba
@@ -54,10 +57,6 @@ def initMorpheme(hanzi: str,
       merged=merged,
       hidden=hidden,
       guessed=guessed)
-
-
-def accumulate(key: str):
-  return readings[key] if key in readings else None, cdict[key] if key in cdict else None
 
 
 def allSubwords(s: str):
@@ -127,30 +126,14 @@ def guessMissingReadings(morphemes: list[Morpheme]):
 
 ChineseAnalyzerResult = typing.Any
 
-linesResults: list[tuple[str, typing.Optional[ChineseAnalyzerResult]]] = []
-with cache_analysis(ANALYSIS_CACHE_FILE, analyzer) as cache:
-  for line in sys.stdin.readlines():
-    if len(line) == 0:
-      result = None
+
+def parseTextToMorphemes(line: str) -> list[Morpheme]:
+  with cache_analysis(ANALYSIS_CACHE_FILE, analyzer) as cache:
+    if line in cache:
+      result = cache[line]
     else:
-      if line in cache:
-        result = cache[line]
-      else:
-        result = analyzer.parse(line, traditional=True)
-        cache[line] = result
-
-    linesResults.append((line, result))
-
-parsed: list[typing.Optional[list[Morpheme]]] = []
-# outer list: lines
-# inner list: morphemes or nothing (empty line)
-
-for line, result in linesResults:
-  if result is None:
-    parsed.append(None)
-    continue
-
-  print(f'## {line}')
+      result = analyzer.parse(line, traditional=True)
+      cache[line] = result
 
   morphemes: list[Morpheme] = []
   for token in result.tokens():
@@ -200,9 +183,7 @@ for line, result in linesResults:
 
   guessMissingReadings(morphemes)
 
-  import json
-  print(json.dumps(morphemes, ensure_ascii=False))
-  parsed.append(morphemes)
+  return morphemes
 
 
 def cantoneseToHtml(c: str, prefix='', suffix='') -> str:
@@ -249,6 +230,22 @@ def morphemeToRuby(m: Morpheme) -> str:
   return f'<ruby>{m["hanzi"]}<rt>{guess}{canto}{more}</rt></ruby>'
 
 
-ruby = "".join("".join(map(morphemeToRuby, line)) if line else '\n' for line in parsed)
-print("# Readings as HTML")
-print(ruby)
+if __name__ == '__main__':
+  import json
+  import sys
+
+  stdin = sys.stdin.read()
+  morphemes = parseTextToMorphemes(stdin)
+  ruby = "".join(map(morphemeToRuby, morphemes))
+  print("# Morphemes")
+
+  morphemesIter = iter(morphemes)
+  for line in partitionBy(lambda m: m['hanzi'] == '\n', morphemesIter):
+    text = "".join(m['hanzi'] for m in line if not m['hidden'])
+    if len(text.strip()) == 0:
+      continue
+    print(f"## {text}")
+    print(json.dumps(line, ensure_ascii=False))
+
+  print("# Readings as HTML")
+  print(ruby)
