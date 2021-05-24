@@ -239,7 +239,7 @@ def morphemeToBulletedDefs(m: Morpheme) -> str:
     return ''
   markdown = f"- {morphemeToRuby(m)}\n"
   if len(m['cantoDefinitions']):
-    sub = ['  - ' + d['definition'] for d in m['cantoDefinitions']]
+    sub = [f'  - {d["cantonese"]} : {d["definition"]}' for d in m['cantoDefinitions']]
   else:
     sub = ['  - ' + " / ".join(d) for d in m['definitions'] if d is not None]
   return markdown + '\n'.join(sub)

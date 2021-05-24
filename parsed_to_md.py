@@ -6,6 +6,9 @@ from partition_by import partitionBy
 if __name__ == '__main__':
   morphemes: list[Morpheme] = json.load(sys.stdin)
   ruby = "".join(map(morphemeToRuby, morphemes))
+  print("# Readings as HTML")
+  print(ruby)
+
   print("# Morphemes")
 
   morphemesIter = iter(morphemes)
@@ -20,6 +23,4 @@ if __name__ == '__main__':
       bullets = morphemeToBulletedDefs(m)
       if len(bullets):
         print(bullets)
-
-  print("# Readings as HTML")
-  print(ruby)
+    print(json.dumps(line, ensure_ascii=False))
