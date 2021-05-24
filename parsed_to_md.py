@@ -1,0 +1,20 @@
+import sys
+import json
+from parse import morphemeToRuby, Morpheme
+from partition_by import partitionBy
+
+if __name__ == '__main__':
+  morphemes: list[Morpheme] = json.load(sys.stdin)
+  ruby = "".join(map(morphemeToRuby, morphemes))
+  print("# Morphemes")
+
+  morphemesIter = iter(morphemes)
+  for line in partitionBy(lambda m: m['hanzi'] == '\n', morphemesIter):
+    text = "".join(m['hanzi'] for m in line if not m['hidden'])
+    if len(text.strip()) == 0:
+      continue
+    print(f"## {text}")
+    print(json.dumps(line, ensure_ascii=False))
+
+  print("# Readings as HTML")
+  print(ruby)

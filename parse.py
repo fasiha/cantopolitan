@@ -6,12 +6,10 @@ import typing
 import re
 from cache_analysis import cache_analysis
 from wordfill import fill as wordfill
-from partition_by import partitionBy
 
 readings = initReadings('cccedict-canto-readings-150923.txt')
 cdict = initDict('cccanto-webdist.txt')
 ANALYSIS_CACHE_FILE = 'analysis_cache.pickle'
-analyzer = ChineseAnalyzer()
 
 
 def cleanPinyin(pinyin: typing.Optional[list[str]]) -> typing.Optional[str]:
@@ -128,6 +126,8 @@ ChineseAnalyzerResult = typing.Any
 
 
 def parseTextToMorphemes(line: str) -> list[Morpheme]:
+  analyzer = ChineseAnalyzer()
+
   with cache_analysis(ANALYSIS_CACHE_FILE, analyzer) as cache:
     if line in cache:
       result = cache[line]
@@ -236,16 +236,4 @@ if __name__ == '__main__':
 
   stdin = sys.stdin.read()
   morphemes = parseTextToMorphemes(stdin)
-  ruby = "".join(map(morphemeToRuby, morphemes))
-  print("# Morphemes")
-
-  morphemesIter = iter(morphemes)
-  for line in partitionBy(lambda m: m['hanzi'] == '\n', morphemesIter):
-    text = "".join(m['hanzi'] for m in line if not m['hidden'])
-    if len(text.strip()) == 0:
-      continue
-    print(f"## {text}")
-    print(json.dumps(line, ensure_ascii=False))
-
-  print("# Readings as HTML")
-  print(ruby)
+  print(json.dumps(morphemes))

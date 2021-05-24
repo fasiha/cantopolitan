@@ -15,12 +15,12 @@ Then, after making sure you have [Git](https://git-scm.com) and [Python](https:/
 
 ## Run
 
-`main.py` reads input from `stdin` (see [this](https://stackoverflow.com/q/8980520) reference for a quick tutorial on `stdin`, `stdout`, etc.). You can do something like this:
+`parse.py` reads input from `stdin` (see [this](https://stackoverflow.com/q/8980520) reference for a quick tutorial on `stdin`, `stdout`, etc.), and prints out a JSON file that you can redirect to a file. You can do something like this:
 ```
-echo 大香港精神 | python main.py
+echo 大香港精神 | python main.py > output.json
 ```
 or
 ```
-python main.py < MY_CANTONESE_TEXT_FILE.txt
+python main.py < MY_CANTONESE_TEXT_FILE.txt > output.json
 ```
-and this Python code will spit out a lot of text about the input, including dictionary hits via Jieba/CC-CEDICT and via CC-Canto, and pronunciation. This output is *very messy* sorry in advance.
+The JSON includes various things like dictionary hits via Jieba/CC-CEDICT and via CC-Canto, and pronunciation.
