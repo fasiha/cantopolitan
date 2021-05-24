@@ -230,6 +230,21 @@ def morphemeToRuby(m: Morpheme) -> str:
   return f'<ruby>{m["hanzi"]}<rt>{guess}{canto}{more}</rt></ruby>'
 
 
+def lenNotNone(l: list) -> int:
+  return sum(1 for x in l if x is not None)
+
+
+def morphemeToBulletedDefs(m: Morpheme) -> str:
+  if m['hidden'] or (len(m['cantoDefinitions']) == 0 and lenNotNone(m['definitions']) == 0):
+    return ''
+  markdown = f"- {morphemeToRuby(m)}\n"
+  if len(m['cantoDefinitions']):
+    sub = ['  - ' + d['definition'] for d in m['cantoDefinitions']]
+  else:
+    sub = ['  - ' + " / ".join(d) for d in m['definitions'] if d is not None]
+  return markdown + '\n'.join(sub)
+
+
 if __name__ == '__main__':
   import json
   import sys

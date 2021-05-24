@@ -1,13 +1,15 @@
 import typing
 
+T = typing.TypeVar('T')
 
-def partitionBy(f, v: typing.Iterator):
+
+def partitionBy(f, v: typing.Iterator[T]):
   "https://clojuredocs.org/clojure.core/partition-by"
   try:
     x = next(v)
   except StopIteration:
     return []
-  buffer = [x]
+  buffer: list[T] = [x]
   oldy = f(x)
   for x in v:
     y = f(x)

@@ -1,6 +1,6 @@
 import sys
 import json
-from parse import morphemeToRuby, Morpheme
+from parse import morphemeToBulletedDefs, morphemeToRuby, Morpheme
 from partition_by import partitionBy
 
 if __name__ == '__main__':
@@ -14,7 +14,12 @@ if __name__ == '__main__':
     if len(text.strip()) == 0:
       continue
     print(f"## {text}")
-    print(json.dumps(line, ensure_ascii=False))
+    ruby = "".join(map(morphemeToRuby, line))
+    print(f'### {ruby}')
+    for m in line:
+      bullets = morphemeToBulletedDefs(m)
+      if len(bullets):
+        print(bullets)
 
   print("# Readings as HTML")
   print(ruby)
