@@ -1,4 +1,10 @@
 chinese==0.2.1
 click==8.0.0
+Flask==2.0.1
+itsdangerous==2.0.1
 jieba==0.42.1
+Jinja2==3.0.1
+MarkupSafe==2.0.1
 PyNLPIR==0.6.0
+pypandoc==1.5
+Werkzeug==2.0.1

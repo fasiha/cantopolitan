@@ -17,10 +17,21 @@ Then, after making sure you have [Git](https://git-scm.com) and [Python](https:/
 
 `parse.py` reads input from `stdin` (see [this](https://stackoverflow.com/q/8980520) reference for a quick tutorial on `stdin`, `stdout`, etc.), and prints out a JSON file that you can redirect to a file. You can do something like this:
 ```
-echo 大香港精神 | python main.py > output.json
+echo 大香港精神 | python main.py > out.json
 ```
 or
 ```
-python main.py < MY_CANTONESE_TEXT_FILE.txt > output.json
+python main.py < MY_CANTONESE_TEXT_FILE.txt > out.json
 ```
 The JSON includes various things like dictionary hits via Jieba/CC-CEDICT and via CC-Canto, and pronunciation.
+
+Then you can render this JSON to some nice Markdown with `parsed_to_md.py` which reads JSON from `stdin` and outputs Markdown to `stdout`. One way to invoke it is:
+```
+python parsed_to_md.py < out.json > out.md
+```
+
+We also offer a web server that will eventually allow you to edit the automatically-inferred definitions. Start that (macOS and Linux users can do this; Windows users, please [adjust](https://flask.palletsprojects.com/en/2.0.x/quickstart/)) with:
+```
+FLASK_APP=editor_server.py FLASK_ENV=development flask run
+```
+It expects a JSON file called `out.json` to exist and serves it to http://127.0.0.1:5000.
