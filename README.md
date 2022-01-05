@@ -8,6 +8,9 @@ From https://cantonese.org/download.html download and unzip
 1. "The latest version of CC-Canto", which this repo assumes is `cccanto-webdist.txt`, and
 2. "The latest version of our Cantonese readings for CC-CEDICT", which this repo assumes is `cccedict-canto-readings-150923.txt`.
 
+Next, from https://www.mdbg.net/chinese/dictionary?page=cc-cedict download and unzip
+1. "cedict_1_0_ts_utf-8_mdbg.zip - CC-CEDICT", which should yield a text file called `cedict_ts.u8`.
+
 Then, after making sure you have [Git](https://git-scm.com) and [Python](https://www.python.org/downloads/) installed, open your command prompt, then run
 1. `git clone https://github.com/fasiha/cantopolitan.git` to clone a copy of this repo from GitHub to your disk;
 2. `cd cantopolitan` to change into the cloned directory;
@@ -17,11 +20,11 @@ Then, after making sure you have [Git](https://git-scm.com) and [Python](https:/
 
 `parse.py` reads input from `stdin` (see [this](https://stackoverflow.com/q/8980520) reference for a quick tutorial on `stdin`, `stdout`, etc.), and prints out a JSON file that you can redirect to a file. You can do something like this:
 ```
-echo 大香港精神 | python main.py > out.json
+echo 大香港精神 | python parse.py > out.json
 ```
 or
 ```
-python main.py < MY_CANTONESE_TEXT_FILE.txt > out.json
+python parse.py < MY_CANTONESE_TEXT_FILE.txt > out.json
 ```
 The JSON includes various things like dictionary hits via Jieba/CC-CEDICT and via CC-Canto, and pronunciation.
 
