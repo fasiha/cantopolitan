@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from chinese import ChineseAnalyzer
+from chinese import ChineseAnalyzer  # type: ignore
 import os.path
 import typing
 import pickle

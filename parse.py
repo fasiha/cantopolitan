@@ -1,4 +1,4 @@
-from chinese import ChineseAnalyzer
+from chinese import ChineseAnalyzer  # type: ignore
 from readings import ReadingEntry, init as initReadings
 from cccanto import CantoEntry, init as initDict
 import itertools as it
@@ -124,9 +124,10 @@ def guessMissingReadings(morphemes: list[Morpheme]):
 
 ChineseAnalyzerResult = typing.Any
 
+analyzer = ChineseAnalyzer()  # this takes a while to initialize so do it only once
+
 
 def parseTextToMorphemes(line: str) -> list[Morpheme]:
-  analyzer = ChineseAnalyzer()
 
   with cache_analysis(ANALYSIS_CACHE_FILE, analyzer) as cache:
     if line in cache:
@@ -145,6 +146,10 @@ def parseTextToMorphemes(line: str) -> list[Morpheme]:
     morpheme['cantoPinyins'] = readings[token] if token in readings else []
     morphemes.append(morpheme)
 
+  return morphemes
+
+
+def improveMorphemes(morphemes: list[Morpheme]) -> list[Morpheme]:
   # This list of morphemes may have a few things wrong with it:
   # 1. Instead of one morpheme object per real morpheme, Jieba might have given us TWO or more. We need the user to downselect for us.
   # 2. We might be able to consolidate multiple morphemes into a single one if we find a run of them in the CC-Canto.
@@ -250,5 +255,5 @@ if __name__ == '__main__':
   import sys
 
   stdin = sys.stdin.read()
-  morphemes = parseTextToMorphemes(stdin)
+  morphemes = improveMorphemes(parseTextToMorphemes(stdin))
   print(json.dumps(morphemes))
